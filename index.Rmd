@@ -11,6 +11,11 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Summary
 
+The Human Activity Recognition project investigates human activity by means of wearable accelerometers (more information [here](http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har)).
+In this assignment, we investigate the Weight Lifting Exercise Dataset. Six participants were asked to perform the "Unilateral Dumbbell Biceps Curl" in five different fashions: One according to specifiations, i.e. "correct" execution, while the four others involved committing a typical mistake. Our goal here is to predict from accelerometer data the fashion in which an exercise was performed.
+
+We derive two models to fit the data: One using *linear discriminant analysis* (LDA) and a second using *random forest* (RF). The RF model performs significantly better than LDA (estimated out-of-sample accuracies of 97% vs. 68%). This RF model in fact scores 100% in the Course Project Prediction Quiz.
+
 ## Load and clean data
 
 Load libraries:
@@ -117,6 +122,8 @@ cm.rf
 ```
 
 The accuracies on the test set are very close (within 1%) to the in-sample accuracy, with `r percent(cm.rf$overall[1])` for RF and `r percent(cm.lda$overall[1])` for LDA.
+
+## Prediction
 
 The RF model performs remarkably well (suspiciously well?), and we will use it to predict the 20 outcomes in the validation set, with a probability of all of them being correct of `r percent(cm.rf$overall[1]^20, digits = 0)`:
 

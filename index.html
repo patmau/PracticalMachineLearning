@@ -371,6 +371,8 @@ summary {
 
 <div id="summary" class="section level2">
 <h2>Summary</h2>
+<p>The Human Activity Recognition project investigates human activity by means of wearable accelerometers (more information <a href="http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har">here</a>). In this assignment, we investigate the Weight Lifting Exercise Dataset. Six participants were asked to perform the “Unilateral Dumbbell Biceps Curl” in five different fashions: One according to specifiations, i.e. “correct” execution, while the four others involved committing a typical mistake. Our goal here is to predict from accelerometer data the fashion in which an exercise was performed.</p>
+<p>We derive two models to fit the data: One using <em>linear discriminant analysis</em> (LDA) and a second using <em>random forest</em> (RF). The RF model performs significantly better than LDA (estimated out-of-sample accuracies of 97% vs. 68%). This RF model in fact scores 100% in the Course Project Prediction Quiz.</p>
 </div>
 <div id="load-and-clean-data" class="section level2">
 <h2>Load and clean data</h2>
@@ -556,6 +558,9 @@ cm.rf</code></pre>
 ## Detection Prevalence   0.2845   0.1935   0.1743   0.1639   0.1837
 ## Balanced Accuracy      0.9896   0.9885   0.9669   0.9883   0.9970</code></pre>
 <p>The accuracies on the test set are very close (within 1%) to the in-sample accuracy, with 97.80% for RF and 68.58% for LDA.</p>
+</div>
+<div id="prediction" class="section level2">
+<h2>Prediction</h2>
 <p>The RF model performs remarkably well (suspiciously well?), and we will use it to predict the 20 outcomes in the validation set, with a probability of all of them being correct of 64%:</p>
 <pre class="r"><code>validation.pred.rf &lt;- predict(rf.mdl, validation)
 validation.pred.rf</code></pre>
