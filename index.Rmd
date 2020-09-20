@@ -1,0 +1,130 @@
+---
+title: 'Prediction Assignment: Barbell Lifting'
+author: "patmau"
+date: "9/18/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Summary
+
+## Load and clean data
+
+Load libraries:
+```{r requirements, message=FALSE}
+library(ggplot2)
+library(caret)
+library(formattable)
+library(doParallel)
+```
+
+Load data:
+```{r loadData}
+training <- read.csv(file = "data/pml-training.csv", header = TRUE)
+validation <- read.csv(file = "data/pml-testing.csv", header = TRUE)
+
+dim(training)
+```
+
+Since the validation data does not contain the outcome("classe"), we split the training data in two sets: One for training our models, and another for assessing our models' prediction capability.
+```{r splitData}
+set.seed(999)
+
+inTrain <- createDataPartition(training$classe, p = 0.75, list = FALSE)
+
+train.dat <- training[inTrain, ]
+test.dat <- training[-inTrain, ]
+
+dim(train.dat); dim(test.dat)
+
+```
+
+Many columns in the training set are mostly NA or empty (14406 out of 14718 rows, `r percent(14406/14718, digits = 1)`), we remove those from the data sets:
+```{r removeNA}
+naCounts <- sapply(1:ncol(train.dat), function(i) {sum(train.dat[, i] == "" | is.na(train.dat[, i]))})
+naCounts
+
+uselessCols <- which(naCounts > 0)
+train.dat <- train.dat[, -uselessCols]
+test.dat <- test.dat[, -uselessCols]
+
+sum(train.dat == "" | is.na(train.dat))
+
+```
+
+This leaves us with `r ncol(train.dat)` observables. The first eight columns of the training data contain values such as user names and time-stamps. These may well be valid predictors, but we are interested in predicting outcome from measurements resulting from the body-activity itself, rather than by whom or when it was performed.
+
+```{r cleanFurther}
+
+train.dat$classe <- as.factor(train.dat$classe)
+test.dat$classe <- as.factor(test.dat$classe)
+
+train.num.dat <- train.dat[, -c(1:8)]
+test.num.dat <- test.dat[, -c(1:8)]
+```
+
+## Model fitting
+
+We are now ready to fit a model to our data.
+In order to speed up computations, we follow the suggestions presented [here](https://github.com/lgreski/datasciencectacontent/blob/master/markdown/pml-randomForestPerformance.md):
+
+- Run the computation in parallel
+
+- Replace the default method of bootstrapping by 5-fold cross validation
+
+```{r parallelSetup}
+#parallel setup
+cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+registerDoParallel(cluster)
+
+trControl <- trainControl(
+    method = "cv",
+    number = 5,
+    allowParallel = TRUE)
+```
+
+We now fit two models to the training set, one using *linear discriminant analysis* (LDA), the other using a *random forest* (RF). For the RF approach, we preprocess the data using principal components analysis (PCA) in order to further speed up the computation.
+```{r modelFit, cache=TRUE}
+lda.mdl <- train(classe ~ ., method = "lda", data = train.num.dat, trControl = trControl)
+rf.mdl <- train(classe ~ ., method = "rf", preProcess = "pca", data = train.num.dat, trControl = trControl)
+
+lda.mdl$results
+rf.mdl$results
+```
+
+The RF-model clearly outperforms LDA, with an in-sample accuracy of `r percent(rf.mdl$results[1, 2])` compared to `r percent(lda.mdl$results[2])` for LDA. This improvement, however, comes with significant computational cost.
+
+Return to sequential processing:
+```{r endParallel, results=FALSE}
+stopCluster(cluster)
+registerDoSEQ
+```
+
+We now use the two models to predict "classe" outcome in our test data and compute a confusion matrix. This will give us an idea of the out-of-sample error.
+```{r predictTest}
+
+pred.lda <- predict(lda.mdl, test.num.dat)
+cm.lda <- confusionMatrix(test.num.dat$classe, pred.lda)
+cm.lda
+
+pred.rf <- predict(rf.mdl, test.num.dat)
+cm.rf <- confusionMatrix(test.num.dat$classe, pred.rf)
+cm.rf
+```
+
+The accuracies on the test set are only slightly below the in-sample accuracy, with `r percent(cm.rf$overall[1])` for RF and `r percent(cm.lda$overall[1])` for LDA. Again, RF performance is excellent.
+`r cm.rf$overall[1]^20` for 20 correct and `r cm.rf$overall[1] * 20` wrong in 20.
+
+```{r precictValidation}
+validation.pred.rf <- predict(rf.mdl, validation)
+validation.pred.rf
+```
+
+## Appendix: System info
+
+```{r sessionInfo}
+sessionInfo()
+```
