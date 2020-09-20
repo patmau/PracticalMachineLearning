@@ -29,7 +29,7 @@ validation <- read.csv(file = "data/pml-testing.csv", header = TRUE)
 dim(training)
 ```
 
-Since the validation data does not contain the outcome("classe"), we split the training data in two sets: One for training our models, and another for assessing our models' prediction capability.
+The validation data does not contain the outcome("classe"). In order to assess the performance of our models, we split a test set with known outcome off from the training set.
 ```{r splitData}
 set.seed(999)
 
@@ -42,7 +42,7 @@ dim(train.dat); dim(test.dat)
 
 ```
 
-Many columns in the training set are mostly NA or empty (14406 out of 14718 rows, `r percent(14406/14718, digits = 1)`), we remove those from the data sets:
+Many columns in the training set are mostly NA or empty (14406 out of 14718 rows, `r percent(14406/14718, digits = 1)`). We remove those from the data sets:
 ```{r removeNA}
 naCounts <- sapply(1:ncol(train.dat), function(i) {sum(train.dat[, i] == "" | is.na(train.dat[, i]))})
 naCounts
@@ -80,19 +80,20 @@ In order to speed up computations, we follow the suggestions presented [here](ht
 cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
 registerDoParallel(cluster)
 
+# 5-fold cross validation instead of bootstrapping
 trControl <- trainControl(
     method = "cv",
     number = 5,
     allowParallel = TRUE)
 ```
 
-We now fit two models to the training set, one using *linear discriminant analysis* (LDA), the other using a *random forest* (RF). For the RF approach, we preprocess the data using principal components analysis (PCA) in order to further speed up the computation.
+We fit two models to the training set, one using *linear discriminant analysis* (LDA), the other using a *random forest* (RF). For the RF approach, we preprocess the data using principal components analysis (PCA) in order to further speed up the computation.
 ```{r modelFit, cache=TRUE}
 lda.mdl <- train(classe ~ ., method = "lda", data = train.num.dat, trControl = trControl)
 rf.mdl <- train(classe ~ ., method = "rf", preProcess = "pca", data = train.num.dat, trControl = trControl)
 
-lda.mdl$results
-rf.mdl$results
+lda.mdl
+rf.mdl
 ```
 
 The RF-model clearly outperforms LDA, with an in-sample accuracy of `r percent(rf.mdl$results[1, 2])` compared to `r percent(lda.mdl$results[2])` for LDA. This improvement, however, comes with significant computational cost.
@@ -115,8 +116,9 @@ cm.rf <- confusionMatrix(test.num.dat$classe, pred.rf)
 cm.rf
 ```
 
-The accuracies on the test set are only slightly below the in-sample accuracy, with `r percent(cm.rf$overall[1])` for RF and `r percent(cm.lda$overall[1])` for LDA. Again, RF performance is excellent.
-`r cm.rf$overall[1]^20` for 20 correct and `r cm.rf$overall[1] * 20` wrong in 20.
+The accuracies on the test set are very close (within 1%) to the in-sample accuracy, with `r percent(cm.rf$overall[1])` for RF and `r percent(cm.lda$overall[1])` for LDA.
+
+The RF model performs remarkably well (suspiciously well?), and we will use it to predict the 20 outcomes in the validation set, with a probability of all of them being correct of `r percent(cm.rf$overall[1]^20, digits = 0)`:
 
 ```{r precictValidation}
 validation.pred.rf <- predict(rf.mdl, validation)

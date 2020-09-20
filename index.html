@@ -385,7 +385,7 @@ validation &lt;- read.csv(file = &quot;data/pml-testing.csv&quot;, header = TRUE
 
 dim(training)</code></pre>
 <pre><code>## [1] 19622   160</code></pre>
-<p>Since the validation data does not contain the outcome(“classe”), we split the training data in two sets: One for training our models, and another for assessing our models’ prediction capability.</p>
+<p>The validation data does not contain the outcome(“classe”). In order to assess the performance of our models, we split a test set with known outcome off from the training set.</p>
 <pre class="r"><code>set.seed(999)
 
 inTrain &lt;- createDataPartition(training$classe, p = 0.75, list = FALSE)
@@ -396,7 +396,7 @@ test.dat &lt;- training[-inTrain, ]
 dim(train.dat); dim(test.dat)</code></pre>
 <pre><code>## [1] 14718   160</code></pre>
 <pre><code>## [1] 4904  160</code></pre>
-<p>Many columns in the training set are mostly NA or empty (14406 out of 14718 rows, 97.9%), we remove those from the data sets:</p>
+<p>Many columns in the training set are mostly NA or empty (14406 out of 14718 rows, 97.9%). We remove those from the data sets:</p>
 <pre class="r"><code>naCounts &lt;- sapply(1:ncol(train.dat), function(i) {sum(train.dat[, i] == &quot;&quot; | is.na(train.dat[, i]))})
 naCounts</code></pre>
 <pre><code>##   [1]     0     0     0     0     0     0     0     0     0     0     0 14406
@@ -437,22 +437,49 @@ test.num.dat &lt;- test.dat[, -c(1:8)]</code></pre>
 cluster &lt;- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
 registerDoParallel(cluster)
 
+# 5-fold cross validation instead of bootstrapping
 trControl &lt;- trainControl(
     method = &quot;cv&quot;,
     number = 5,
     allowParallel = TRUE)</code></pre>
-<p>We now fit two models to the training set, one using <em>linear discriminant analysis</em> (LDA), the other using a <em>random forest</em> (RF). For the RF approach, we preprocess the data using principal components analysis (PCA) in order to further speed up the computation.</p>
+<p>We fit two models to the training set, one using <em>linear discriminant analysis</em> (LDA), the other using a <em>random forest</em> (RF). For the RF approach, we preprocess the data using principal components analysis (PCA) in order to further speed up the computation.</p>
 <pre class="r"><code>lda.mdl &lt;- train(classe ~ ., method = &quot;lda&quot;, data = train.num.dat, trControl = trControl)
 rf.mdl &lt;- train(classe ~ ., method = &quot;rf&quot;, preProcess = &quot;pca&quot;, data = train.num.dat, trControl = trControl)
 
-lda.mdl$results</code></pre>
-<pre><code>##   parameter  Accuracy     Kappa  AccuracySD     KappaSD
-## 1      none 0.6897682 0.6073532 0.007085812 0.009145741</code></pre>
-<pre class="r"><code>rf.mdl$results</code></pre>
-<pre><code>##   mtry  Accuracy     Kappa  AccuracySD     KappaSD
-## 1    2 0.9707839 0.9630328 0.002983531 0.003779457
-## 2   26 0.9578068 0.9466180 0.002793841 0.003542208
-## 3   51 0.9582823 0.9472207 0.002877713 0.003640031</code></pre>
+lda.mdl</code></pre>
+<pre><code>## Linear Discriminant Analysis 
+## 
+## 14718 samples
+##    51 predictor
+##     5 classes: &#39;A&#39;, &#39;B&#39;, &#39;C&#39;, &#39;D&#39;, &#39;E&#39; 
+## 
+## No pre-processing
+## Resampling: Cross-Validated (5 fold) 
+## Summary of sample sizes: 11774, 11776, 11775, 11774, 11773 
+## Resampling results:
+## 
+##   Accuracy   Kappa    
+##   0.6897682  0.6073532</code></pre>
+<pre class="r"><code>rf.mdl</code></pre>
+<pre><code>## Random Forest 
+## 
+## 14718 samples
+##    51 predictor
+##     5 classes: &#39;A&#39;, &#39;B&#39;, &#39;C&#39;, &#39;D&#39;, &#39;E&#39; 
+## 
+## Pre-processing: principal component signal extraction (51), centered
+##  (51), scaled (51) 
+## Resampling: Cross-Validated (5 fold) 
+## Summary of sample sizes: 11774, 11774, 11775, 11774, 11775 
+## Resampling results across tuning parameters:
+## 
+##   mtry  Accuracy   Kappa    
+##    2    0.9707839  0.9630328
+##   26    0.9578068  0.9466180
+##   51    0.9582823  0.9472207
+## 
+## Accuracy was used to select the optimal model using the largest value.
+## The final value used for the model was mtry = 2.</code></pre>
 <p>The RF-model clearly outperforms LDA, with an in-sample accuracy of 97.08% compared to 68.98% for LDA. This improvement, however, comes with significant computational cost.</p>
 <p>Return to sequential processing:</p>
 <pre class="r"><code>stopCluster(cluster)
@@ -528,7 +555,8 @@ cm.rf</code></pre>
 ## Detection Rate         0.2818   0.1870   0.1713   0.1572   0.1807
 ## Detection Prevalence   0.2845   0.1935   0.1743   0.1639   0.1837
 ## Balanced Accuracy      0.9896   0.9885   0.9669   0.9883   0.9970</code></pre>
-<p>The accuracies on the test set are only slightly below the in-sample accuracy, with 97.80% for RF and 68.58% for LDA. Again, RF performance is excellent. 0.6405813 for 20 correct and 19.5595432 wrong in 20.</p>
+<p>The accuracies on the test set are very close (within 1%) to the in-sample accuracy, with 97.80% for RF and 68.58% for LDA.</p>
+<p>The RF model performs remarkably well (suspiciously well?), and we will use it to predict the 20 outcomes in the validation set, with a probability of all of them being correct of 64%:</p>
 <pre class="r"><code>validation.pred.rf &lt;- predict(rf.mdl, validation)
 validation.pred.rf</code></pre>
 <pre><code>##  [1] B A B A A E D B A A B C B A E E A B B B
